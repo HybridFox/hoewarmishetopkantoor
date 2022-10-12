@@ -1,0 +1,59 @@
+version: "3"
+services:
+    server:
+        build:
+            context: api
+            dockerfile: Dockerfile.dev
+        container_name: hoewarmishetopkantoor-api
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        ports:
+            - 3001:3001
+        volumes:
+            - ./api:/app:delegateds
+            - /app/node_modules
+            - /app/data
+        env_file:
+            - ./api/src/config/local.env
+        networks:
+            - hoewarmishetopkantoor
+
+    influxdb:
+        image: "influxdb:2.4.0-alpine"
+        container_name: influx
+        environment:
+            DOCKER_INFLUXDB_INIT_MODE: setup
+            DOCKER_INFLUXDB_INIT_USERNAME: hoewarmishetopkantoor
+            DOCKER_INFLUXDB_INIT_PASSWORD: S10nm91ckh91!
+            DOCKER_INFLUXDB_INIT_ORG: akxis
+            DOCKER_INFLUXDB_INIT_BUCKET: hoewarmishetopkantoor
+        ports:
+            - 8086:8086
+        volumes:
+            - ./data/storage:/var/lib/influxdb2
+            - ./data/config:/etc/influxdb2
+        networks:
+            - hoewarmishetopkantoor
+
+    app:
+        build:
+            context: app
+            dockerfile: Dockerfile.dev
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        container_name: hoewarmishetopkantoor-app
+        volumes:
+            - ./app:/app:delegated
+            - /app/node_modules
+            - /app/dist
+        ports:
+            - 3000:3000
+        networks:
+            - hoewarmishetopkantoor
+
+volumes:
+    redis-data:
+    elastic-data:
+
+networks:
+    hoewarmishetopkantoor:
