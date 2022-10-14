@@ -10,11 +10,14 @@ export class SensorController {
 		@Param('sensorId') sensorId: string,
 		@Query('field') field: string,
 		@Query('rangeStart') rangeStart = '-1d',
+		@Query('rangeStop') rangeStop,
+		@Query('sample') sample,
 	) {
 		const query = `from(bucket:"${process.env.INFLUX_BUCKET}")
-			|> range(start: ${rangeStart})
+			|> range(start: ${rangeStart}${rangeStop ? `, stop: ${rangeStop}` : ''})
 			|> filter(fn: (r) => r._measurement == "${sensorId}" and r._field == "${field}")
-			|> sort(columns: ["_time"])`;
+			|> sort(columns: ["_time"])
+			${sample ? `|> sample(n: ${sample}, pos: 1)` : ''}`;
 
 		return influxQueryApi.collectRows(query);
 	}

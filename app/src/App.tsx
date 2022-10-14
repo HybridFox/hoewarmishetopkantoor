@@ -1,39 +1,82 @@
 import ky from 'ky';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import moment from 'moment';
-import { LineChart, Line, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip, Brush } from 'recharts';
+import debounce from 'lodash.debounce';
+
+import { createChart } from './helpers/graph';
+import { createBrush } from './helpers/brush';
 
 export const App = () => {
 	const [data, setData] = useState<any[]>([]);
-
-	const fetchData = ({ startIndex, endIndex }: { startIndex: number; endIndex: number }) => {
-		console.log(startIndex, endIndex);
-	};
+	const [currentTemperature, setCurrentTemperature] = useState<any>([]);
+	const [navigatorData, setNavigatorData] = useState<any[]>([]);
+	const [view, setView] = useState<[Date, Date]>();
+	const svgRef = useRef(null);
 
 	useEffect(() => {
+		updateCurrentTemperature();
+		updateRangeView();
+
+		setInterval(() => {
+			updateCurrentTemperature();
+			updateRangeView();
+			updateView();
+		}, 60_000);
+	}, []);
+
+	useEffect(() => updateView(), [view]);
+
+	const updateRangeView = () => {
 		ky.get('/api/v1/sensors/kontich-temperature', {
 			searchParams: {
 				field: 'temperature',
+				rangeStart: '-1mo',
+				sample: '5',
+			},
+		})
+			.json()
+			.then((values) => setNavigatorData(values as any[]));
+	};
+
+	const updateCurrentTemperature = () => {
+		ky.get('/api/v1/sensors/kontich-temperature', {
+			searchParams: {
+				field: 'temperature',
+				rangeStart: '-10m',
+			},
+		})
+			.json<any[]>()
+			.then((value) => {
+				setCurrentTemperature(value[value.length - 1]);
+			});
+	};
+
+	const updateView = () => {
+		ky.get('/api/v1/sensors/kontich-temperature', {
+			searchParams: {
+				field: 'temperature',
+				rangeStart: view?.[0].toISOString() || '-24h',
+				...(view?.[1].toISOString() && { rangeStop: view?.[1].toISOString() }),
 			},
 		})
 			.json()
 			.then((values) => setData(values as any[]));
-	}, []);
+	};
+
+	const handleBrushSelection = (range: [Date, Date]) => {
+		console.log('set view');
+		setView(range);
+	};
+
+	const brush = useMemo(() => createBrush(navigatorData, svgRef, handleBrushSelection), [navigatorData]);
 
 	return (
 		<div style={{ width: '100%' }}>
-			<h4>A demo of synchronized AreaCharts</h4>
-
-			<ResponsiveContainer width="100%" height={500}>
-				<LineChart data={data}>
-					<CartesianGrid strokeDasharray="3 3" />
-					<XAxis dataKey="_time" tickFormatter={(value) => moment(value).format('YYYY-MM-DD HH:mm')} />
-					<YAxis />
-					<Tooltip />
-					<Line type="monotone" dataKey="_value" stroke="#82ca9d" fill="#82ca9d" />
-				</LineChart>
-			</ResponsiveContainer>
-			<Brush onChange={fetchData as any} data={data} dataKey="_time" />
+			<h1>
+				Het is nu <span>{currentTemperature._value}°C</span>
+			</h1>
+			{createChart(data)}
+			{brush}
 		</div>
 	);
 };

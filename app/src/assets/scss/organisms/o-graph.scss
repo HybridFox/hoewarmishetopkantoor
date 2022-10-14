@@ -1,0 +1,16 @@
+.o-graph {
+	.tick {
+		text {
+			color: $lighter-gray
+		}
+
+		line {
+			color: $gray;
+			stroke-opacity: 0.3;
+		}
+	}
+
+	.domain {
+		color: $gray
+	}
+}
